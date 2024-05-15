@@ -424,4 +424,4 @@ impl<const N: usize> VfsReactor<N> {
     }
 }
 
-pub static VFS_REACTOR: VfsReactor<MAX_REGISTRATIONS> = VfsReactor::new();
+pub static REACTOR: VfsReactor<MAX_REGISTRATIONS> = VfsReactor::new();

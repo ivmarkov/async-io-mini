@@ -40,7 +40,7 @@ use log::error;
 
 use libc as sys;
 
-use reactor::{Event, VFS_REACTOR as REACTOR};
+use reactor::{Event, REACTOR};
 
 mod reactor;
 
