@@ -1,0 +1,17 @@
+[package]
+name = "async-io-mini"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+libc = "0.2"
+enumset = "1"
+heapless = "0.8"
+futures-io = "0.3"
+futures-lite = "1"
+log = { version = "0.4", default-features = false }
+
+[dev-dependencies]
+embassy-time = { version = "0.3", features = ["std", "generic-queue"] }
+async-channel = "2"
+env_logger = "0.10"
