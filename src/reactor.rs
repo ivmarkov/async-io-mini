@@ -22,10 +22,6 @@ const MAX_REGISTRATIONS: usize = 20;
 
 const FD_SEGMENT: usize = sys::FD_SETSIZE / core::mem::size_of::<sys::fd_set>();
 
-// const FD_ZERO: sys::fd_set = sys::fd_set {
-//     fds_bits: [0; sys::FD_SETSIZE as usize / sys::ULONG_SIZE],
-// };
-
 #[macro_export]
 macro_rules! syscall {
     ($ret:expr) => {{
@@ -51,6 +47,7 @@ macro_rules! syscall_los {
 #[macro_export]
 macro_rules! syscall_los_eagain {
     ($ret:expr) => {{
+        #[allow(unreachable_patterns)]
         match syscall_los!($ret) {
             Ok(_) => Ok(()),
             Err(e)
