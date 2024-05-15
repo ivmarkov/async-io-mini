@@ -7,9 +7,9 @@ edition = "2021"
 libc = "0.2"
 enumset = "1"
 heapless = "0.8"
-futures-io = "0.3"
-futures-lite = "1"
 log = { version = "0.4", default-features = false }
+futures-io = { version = "0.3", default-features = false, optional = true, features = ["std"] }
+futures-lite = { version = "1", default-features = false, optional = true }
 
 [dev-dependencies]
 embassy-time = { version = "0.3", features = ["std", "generic-queue"] }

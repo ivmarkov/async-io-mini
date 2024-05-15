@@ -28,38 +28,19 @@
 //! ```
 
 use core::future::{poll_fn, Future};
-use core::pin::{pin, Pin};
+use core::pin::pin;
 use core::task::{Context, Poll};
 
-use std::io::{self, IoSlice, IoSliceMut, Read, Write};
+use std::io::{self, Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream, UdpSocket};
 use std::os::fd::FromRawFd;
 use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, OwnedFd, RawFd};
-
-use futures_lite::{stream, Stream};
 
 use log::error;
 
 use libc as sys;
 
-use reactor::{Event, VFS_REACTOR};
-
-use futures_io::{AsyncRead, AsyncWrite};
-// use futures_lite::stream::{self, Stream};
-// use futures_lite::{future, pin, ready};
-
-// use rustix::io as rio;
-// use rustix::net as rn;
-
-// use crate::reactor::{Reactor, Registration, Source};
-
-// mod driver;
-// mod reactor;
-
-// pub mod os;
-
-// pub use driver::block_on;
-// pub use reactor::{Readable, ReadableOwned, Writable, WritableOwned};
+use reactor::{Event, VFS_REACTOR as REACTOR};
 
 mod reactor;
 
@@ -228,9 +209,9 @@ impl<T: AsFd> Async<T> {
     /// it is not set. If not set to non-blocking mode, I/O operations may block the current thread
     /// and cause a deadlock in an asynchronous context.
     pub fn new_nonblocking(io: T) -> io::Result<Self> {
-        VFS_REACTOR.start()?;
+        REACTOR.start()?;
         // SAFETY: It is impossible to drop the I/O source while it is registered.
-        VFS_REACTOR.register(io.as_fd().as_raw_fd())?;
+        REACTOR.register(io.as_fd().as_raw_fd())?;
 
         Ok(Self { io: Some(io) })
     }
@@ -322,7 +303,7 @@ impl<T: AsFd> Async<T> {
     /// # std::io::Result::Ok(()) });
     /// ```
     pub fn into_inner(mut self) -> io::Result<T> {
-        VFS_REACTOR.deregister(self.as_fd().as_raw_fd())?;
+        REACTOR.deregister(self.as_fd().as_raw_fd())?;
         Ok(self.io.take().unwrap())
     }
 
@@ -397,10 +378,10 @@ impl<T: AsFd> Async<T> {
     /// # std::io::Result::Ok(()) });
     /// ```
     pub fn poll_readable(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        if VFS_REACTOR.fetch(self.as_fd().as_raw_fd(), Event::Read)? {
+        if REACTOR.fetch(self.as_fd().as_raw_fd(), Event::Read)? {
             Poll::Ready(Ok(()))
         } else {
-            VFS_REACTOR.set(self.as_fd().as_raw_fd(), Event::Read, cx.waker())?;
+            REACTOR.set(self.as_fd().as_raw_fd(), Event::Read, cx.waker())?;
 
             Poll::Pending
         }
@@ -435,10 +416,10 @@ impl<T: AsFd> Async<T> {
     /// # std::io::Result::Ok(()) });
     /// ```
     pub fn poll_writable(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        if VFS_REACTOR.fetch(self.as_fd().as_raw_fd(), Event::Write)? {
+        if REACTOR.fetch(self.as_fd().as_raw_fd(), Event::Write)? {
             Poll::Ready(Ok(()))
         } else {
-            VFS_REACTOR.set(self.as_fd().as_raw_fd(), Event::Write, cx.waker())?;
+            REACTOR.set(self.as_fd().as_raw_fd(), Event::Write, cx.waker())?;
 
             Poll::Pending
         }
@@ -467,7 +448,7 @@ impl<T: AsFd> Async<T> {
     /// # std::io::Result::Ok(()) });
     /// ```
     pub async fn read_with<R>(&self, op: impl FnMut(&T) -> io::Result<R>) -> io::Result<R> {
-        VFS_REACTOR.fetch(self.as_fd().as_raw_fd(), Event::Read)?;
+        REACTOR.fetch(self.as_fd().as_raw_fd(), Event::Read)?;
 
         let mut op = op;
         loop {
@@ -509,7 +490,7 @@ impl<T: AsFd> Async<T> {
         &mut self,
         op: impl FnMut(&mut T) -> io::Result<R>,
     ) -> io::Result<R> {
-        VFS_REACTOR.fetch(self.as_fd().as_raw_fd(), Event::Read)?;
+        REACTOR.fetch(self.as_fd().as_raw_fd(), Event::Read)?;
 
         let mut op = op;
         loop {
@@ -545,7 +526,7 @@ impl<T: AsFd> Async<T> {
     /// # std::io::Result::Ok(()) });
     /// ```
     pub async fn write_with<R>(&self, op: impl FnMut(&T) -> io::Result<R>) -> io::Result<R> {
-        VFS_REACTOR.fetch(self.as_fd().as_raw_fd(), Event::Write)?;
+        REACTOR.fetch(self.as_fd().as_raw_fd(), Event::Write)?;
 
         let mut op = op;
         loop {
@@ -587,7 +568,7 @@ impl<T: AsFd> Async<T> {
         &mut self,
         op: impl FnMut(&mut T) -> io::Result<R>,
     ) -> io::Result<R> {
-        VFS_REACTOR.fetch(self.as_fd().as_raw_fd(), Event::Write)?;
+        REACTOR.fetch(self.as_fd().as_raw_fd(), Event::Write)?;
 
         let mut op = op;
         loop {
@@ -609,7 +590,7 @@ impl<T: AsFd> AsRef<T> for Async<T> {
 impl<T: AsFd> Drop for Async<T> {
     fn drop(&mut self) {
         if let Some(io) = &self.io {
-            VFS_REACTOR.deregister(io.as_fd().as_raw_fd()).ok();
+            REACTOR.deregister(io.as_fd().as_raw_fd()).ok();
         }
     }
 }
@@ -702,9 +683,10 @@ unsafe impl<T: IoSafe + ?Sized> IoSafe for &mut T {}
 //unsafe impl<T: IoSafe + ?Sized> IoSafe for alloc::boxed::Box<T> {}
 unsafe impl<T: Clone + IoSafe + ?Sized> IoSafe for std::borrow::Cow<'_, T> {}
 
-impl<T: AsFd + IoSafe + Read> AsyncRead for Async<T> {
+#[cfg(feature = "futures-io")]
+impl<T: AsFd + IoSafe + Read> futures_io::AsyncRead for Async<T> {
     fn poll_read(
-        mut self: Pin<&mut Self>,
+        mut self: core::pin::Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
@@ -718,9 +700,9 @@ impl<T: AsFd + IoSafe + Read> AsyncRead for Async<T> {
     }
 
     fn poll_read_vectored(
-        mut self: Pin<&mut Self>,
+        mut self: core::pin::Pin<&mut Self>,
         cx: &mut Context<'_>,
-        bufs: &mut [IoSliceMut<'_>],
+        bufs: &mut [std::io::IoSliceMut<'_>],
     ) -> Poll<io::Result<usize>> {
         loop {
             match unsafe { (*self).get_mut() }.read_vectored(bufs) {
@@ -734,12 +716,13 @@ impl<T: AsFd + IoSafe + Read> AsyncRead for Async<T> {
 
 // Since this is through a reference, we can't mutate the inner I/O source.
 // Therefore this is safe!
-impl<T: AsFd> AsyncRead for &Async<T>
+#[cfg(feature = "futures-io")]
+impl<T: AsFd> futures_io::AsyncRead for &Async<T>
 where
     for<'a> &'a T: Read,
 {
     fn poll_read(
-        self: Pin<&mut Self>,
+        self: core::pin::Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
@@ -753,9 +736,9 @@ where
     }
 
     fn poll_read_vectored(
-        self: Pin<&mut Self>,
+        self: core::pin::Pin<&mut Self>,
         cx: &mut Context<'_>,
-        bufs: &mut [IoSliceMut<'_>],
+        bufs: &mut [std::io::IoSliceMut<'_>],
     ) -> Poll<io::Result<usize>> {
         loop {
             match (*self).get_ref().read_vectored(bufs) {
@@ -767,9 +750,10 @@ where
     }
 }
 
-impl<T: AsFd + IoSafe + Write> AsyncWrite for Async<T> {
+#[cfg(feature = "futures-io")]
+impl<T: AsFd + IoSafe + Write> futures_io::AsyncWrite for Async<T> {
     fn poll_write(
-        mut self: Pin<&mut Self>,
+        mut self: core::pin::Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
@@ -783,9 +767,9 @@ impl<T: AsFd + IoSafe + Write> AsyncWrite for Async<T> {
     }
 
     fn poll_write_vectored(
-        mut self: Pin<&mut Self>,
+        mut self: core::pin::Pin<&mut Self>,
         cx: &mut Context<'_>,
-        bufs: &[IoSlice<'_>],
+        bufs: &[std::io::IoSlice<'_>],
     ) -> Poll<io::Result<usize>> {
         loop {
             match unsafe { (*self).get_mut() }.write_vectored(bufs) {
@@ -796,7 +780,10 @@ impl<T: AsFd + IoSafe + Write> AsyncWrite for Async<T> {
         }
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+    fn poll_flush(
+        mut self: core::pin::Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<io::Result<()>> {
         loop {
             match unsafe { (*self).get_mut() }.flush() {
                 Err(err) if err.kind() == io::ErrorKind::WouldBlock => {}
@@ -806,17 +793,18 @@ impl<T: AsFd + IoSafe + Write> AsyncWrite for Async<T> {
         }
     }
 
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+    fn poll_close(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.poll_flush(cx)
     }
 }
 
-impl<T: AsFd> AsyncWrite for &Async<T>
+#[cfg(feature = "futures-io")]
+impl<T: AsFd> futures_io::AsyncWrite for &Async<T>
 where
     for<'a> &'a T: Write,
 {
     fn poll_write(
-        self: Pin<&mut Self>,
+        self: core::pin::Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
@@ -830,9 +818,9 @@ where
     }
 
     fn poll_write_vectored(
-        self: Pin<&mut Self>,
+        self: core::pin::Pin<&mut Self>,
         cx: &mut Context<'_>,
-        bufs: &[IoSlice<'_>],
+        bufs: &[std::io::IoSlice<'_>],
     ) -> Poll<io::Result<usize>> {
         loop {
             match (*self).get_ref().write_vectored(bufs) {
@@ -843,7 +831,7 @@ where
         }
     }
 
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+    fn poll_flush(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         loop {
             match (*self).get_ref().flush() {
                 Err(err) if err.kind() == io::ErrorKind::WouldBlock => {}
@@ -853,7 +841,7 @@ where
         }
     }
 
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+    fn poll_close(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.poll_flush(cx)
     }
 }
@@ -923,8 +911,11 @@ impl Async<TcpListener> {
     /// }
     /// # std::io::Result::Ok(()) });
     /// ```
-    pub fn incoming(&self) -> impl Stream<Item = io::Result<Async<TcpStream>>> + Send + '_ {
-        stream::unfold(self, |listener| async move {
+    #[cfg(feature = "futures-lite")]
+    pub fn incoming(
+        &self,
+    ) -> impl futures_lite::Stream<Item = io::Result<Async<TcpStream>>> + Send + '_ {
+        futures_lite::stream::unfold(self, |listener| async move {
             let res = listener.accept().await.map(|(stream, _)| stream);
             Some((res, listener))
         })
