@@ -3,6 +3,9 @@ name = "async-io-mini"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+#default = ["futures-io", "futures-lite"]
+
 [dependencies]
 libc = "0.2"
 enumset = "1"
@@ -12,6 +15,8 @@ futures-io = { version = "0.3", default-features = false, optional = true, featu
 futures-lite = { version = "1", default-features = false, optional = true }
 
 [dev-dependencies]
+futures-io = { version = "0.3", default-features = false, optional = false, features = ["std"] }
+futures-lite = { version = "1", default-features = false, optional = false }
 embassy-time = { version = "0.3", features = ["std", "generic-queue"] }
 async-channel = "2"
 env_logger = "0.10"

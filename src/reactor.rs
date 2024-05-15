@@ -1,26 +1,18 @@
+use core::mem::MaybeUninit;
+use core::sync::atomic::{AtomicBool, Ordering};
 use core::task::Waker;
 
 use std::io::{self, ErrorKind};
-use std::mem::MaybeUninit;
-use std::os::fd::RawFd;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread::Thread;
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 
 use enumset::{EnumSet, EnumSetType};
-use log::error;
-
-//use log::info;
-
-// use crate::hal::cpu::Core;
-// use crate::hal::task::CriticalSection;
-// use crate::sys::esp;
-// use crate::sys::fd_set;
+use log::debug;
 
 use libc as sys;
 
 const MAX_REGISTRATIONS: usize = 20;
 
-const FD_SEGMENT: usize = sys::FD_SETSIZE / core::mem::size_of::<sys::fd_set>();
+//const FD_SEGMENT: usize = sys::FD_SETSIZE / core::mem::size_of::<sys::fd_set>();
 
 #[macro_export]
 macro_rules! syscall {
@@ -129,7 +121,7 @@ struct Registration {
 
 struct Registrations<const N: usize> {
     vec: heapless::Vec<Registration, N>,
-    event_fd: Option<RawFd>,
+    event_fd: Option<OwnedFd>,
 }
 
 impl<const N: usize> Registrations<N> {
@@ -141,6 +133,20 @@ impl<const N: usize> Registrations<N> {
     }
 
     fn register(&mut self, fd: RawFd) -> io::Result<()> {
+        if fd < 0
+            || self
+                .event_fd
+                .as_ref()
+                .map(|event_fd| fd == event_fd.as_raw_fd())
+                .unwrap_or(false)
+        {
+            Err(ErrorKind::InvalidInput)?;
+        }
+
+        if fd >= sys::FD_SETSIZE as RawFd {
+            Err(ErrorKind::OutOfMemory)?;
+        }
+
         if self.vec.iter().any(|reg| reg.fd == fd) {
             Err(ErrorKind::InvalidInput)?;
         }
@@ -203,38 +209,39 @@ impl<const N: usize> Registrations<N> {
 
         let mut max: Option<RawFd> = None;
 
-        if let Some(event_fd) = self.event_fd {
+        if let Some(event_fd) = self.event_fd.as_ref().map(|event_fd| event_fd.as_raw_fd()) {
             fds.set(event_fd, Event::Read);
             max = Some(max.map_or(event_fd, |max| max.max(event_fd)));
-            error!("Event fd set: {event_fd}");
+
+            debug!("Set event FD: {event_fd}");
         }
 
         for registration in &self.vec {
             for event in EnumSet::ALL {
                 if registration.wakers[event as usize].is_some() {
-                    error!("Registration fd set: {event:?} {}", registration.fd);
                     fds.set(registration.fd, event);
+
+                    debug!("Set registration FD: {}/{event:?}", registration.fd);
                 }
 
                 max = Some(max.map_or(registration.fd, |max| max.max(registration.fd)));
             }
         }
 
-        error!("MAX: {max:?}");
+        debug!("Max FDs: {max:?}");
+
         Ok(max)
     }
 
     fn update_events(&mut self, fds: &Fds) -> io::Result<()> {
+        debug!("Updating events");
+
         self.consume_notification()?;
 
-        error!("CONSUMED");
-        // unsafe {
-        // error!("READ: {:?}, WRITE: {:?}", fds.read.assume_init_ref(), fds.write.assume_init_ref());
-        // }
         for registration in &mut self.vec {
             for event in EnumSet::ALL {
                 if fds.is_set(registration.fd, event) {
-                    error!("FD SET: {event:?} {}", registration.fd);
+                    debug!("Registration FD is set: {}/{event:?}", registration.fd);
 
                     registration.events |= event;
                     if let Some(waker) = registration.wakers[event as usize].take() {
@@ -249,9 +256,13 @@ impl<const N: usize> Registrations<N> {
 
     fn create_notification(&mut self) -> io::Result<bool> {
         if self.event_fd.is_none() {
-            let handle = unsafe { sys::eventfd(0, sys::O_NONBLOCK as _) };
+            let event_fd = unsafe {
+                OwnedFd::from_raw_fd(syscall_los!(sys::eventfd(0, sys::O_NONBLOCK as _))?)
+            };
 
-            self.event_fd = Some(handle);
+            debug!("Created event FD: {}", event_fd.as_raw_fd());
+
+            self.event_fd = Some(event_fd);
 
             Ok(true)
         } else {
@@ -261,7 +272,9 @@ impl<const N: usize> Registrations<N> {
 
     fn destroy_notification(&mut self) -> io::Result<bool> {
         if let Some(event_fd) = self.event_fd.take() {
-            syscall!(unsafe { sys::close(event_fd) })?;
+            syscall!(unsafe { sys::close(event_fd.as_raw_fd()) })?;
+
+            debug!("Closed event FD: {}", event_fd.as_raw_fd());
 
             Ok(true)
         } else {
@@ -270,7 +283,9 @@ impl<const N: usize> Registrations<N> {
     }
 
     fn notify(&self) -> io::Result<bool> {
-        if let Some(event_fd) = self.event_fd {
+        if let Some(event_fd) = self.event_fd.as_ref() {
+            let event_fd = event_fd.as_raw_fd();
+
             syscall_los_eagain!(unsafe {
                 sys::write(
                     event_fd,
@@ -286,7 +301,9 @@ impl<const N: usize> Registrations<N> {
     }
 
     fn consume_notification(&mut self) -> io::Result<bool> {
-        if let Some(event_fd) = self.event_fd {
+        if let Some(event_fd) = self.event_fd.as_ref() {
+            let event_fd = event_fd.as_raw_fd();
+
             let mut buf = [0_u8; core::mem::size_of::<u64>()];
 
             syscall_los_eagain!(unsafe {
@@ -297,6 +314,8 @@ impl<const N: usize> Registrations<N> {
                 )
             })?;
 
+            debug!("Consumed notification");
+
             Ok(true)
         } else {
             Ok(false)
@@ -304,120 +323,34 @@ impl<const N: usize> Registrations<N> {
     }
 }
 
-// /// Wake runner configuration
-// #[derive(Clone, Debug)]
-// pub struct VfsReactorConfig {
-//     pub task_name: &'static CStr,
-//     pub task_stack_size: usize,
-//     pub task_priority: u8,
-//     pub task_pin_to_core: Option<Core>,
-// }
-
-// impl VfsReactorConfig {
-//     pub const fn new() -> Self {
-//         Self {
-//             task_name: unsafe { CStr::from_bytes_with_nul_unchecked(b"VfsReactor\0") },
-//             task_stack_size: 1024,
-//             task_priority: 9,
-//             task_pin_to_core: None,
-//         }
-//     }
-// }
-
-// impl Default for VfsReactorConfig {
-//     fn default() -> Self {
-//         Self::new()
-//     }
-// }
-
 pub struct VfsReactor<const N: usize> {
     registrations: std::sync::Mutex<Registrations<N>>,
     started: AtomicBool,
-    // task_cs: CriticalSection,
-    // task: AtomicPtr<crate::sys::tskTaskControlBlock>,
-    // task_config: VfsReactorConfig,
 }
 
 impl<const N: usize> VfsReactor<N> {
     const fn new() -> Self {
         Self {
             registrations: std::sync::Mutex::new(Registrations::new()),
-            // task_cs: CriticalSection::new(),
-            // task: AtomicPtr::new(core::ptr::null_mut()),
-            // task_config: config,
             started: AtomicBool::new(false),
         }
     }
 
-    // /// Returns `true` if the wake runner is started.
-    // pub fn is_started(&self) -> bool {
-    //     !self.task.load(Ordering::SeqCst).is_null()
-    // }
-
-    /// Starts the wake runner. Returns `false` if it had been already started.
+    /// Starts the reactor. Returns `false` if it had been already started.
     pub fn start(&'static self) -> io::Result<bool> {
         if self.started.swap(true, Ordering::SeqCst) {
             return Ok(false);
         }
 
-        std::thread::spawn(move || {
-            if let Err(e) = self.run() {
-                panic!();
-                //error!("IsrReactor {:?} error: {:?}", self.task_config.task_name, e);
-            }
-        });
+        std::thread::Builder::new()
+            .name("async-io-mini".into())
+            .stack_size(3048)
+            .spawn(move || {
+                self.run().unwrap();
+            })?;
 
-        // let _guard = self.task_cs.enter();
-
-        // if self.task.load(Ordering::SeqCst).is_null() {
-        //     let task = unsafe {
-        //         crate::hal::task::create(
-        //             Self::task_run,
-        //             self.task_config.task_name,
-        //             self.task_config.task_stack_size,
-        //             self as *const _ as *const c_void as *mut _,
-        //             self.task_config.task_priority,
-        //             self.task_config.task_pin_to_core,
-        //         )
-        //         .map_err(|e| io::Error::from_raw_os_error(e.code()))?
-        //     };
-
-        //     self.task.store(task as _, Ordering::SeqCst);
-
-        //     info!("IsrReactor {:?} started.", self.task_config.task_name);
-
-        //     Ok(true)
-        // } else {
-        //     Ok(false)
-        // }
         Ok(true)
     }
-
-    // /// Stops the wake runner. Returns `false` if it had been already stopped.
-    // pub fn stop(&self) -> bool {
-    //     let _guard = self.task_cs.enter();
-
-    //     let task = self.task.swap(core::ptr::null_mut(), Ordering::SeqCst);
-
-    //     if !task.is_null() {
-    //         unsafe {
-    //             crate::hal::task::destroy(task as _);
-    //         }
-
-    //         info!("IsrReactor {:?} stopped.", self.task_config.task_name);
-
-    //         true
-    //     } else {
-    //         false
-    //     }
-    // }
-
-    // extern "C" fn task_run(ctx: *mut c_void) {
-    //     let this =
-    //         unsafe { (ctx as *mut VfsReactor<N> as *const VfsReactor<N>).as_ref() }.unwrap();
-
-    //     this.run();
-    // }
 
     pub(crate) fn register(&self, fd: RawFd) -> io::Result<()> {
         self.lock(|regs| regs.register(fd))
@@ -436,10 +369,11 @@ impl<const N: usize> VfsReactor<N> {
     }
 
     fn run(&self) -> io::Result<()> {
-        error!("RUNNING");
         if !self.lock(Registrations::create_notification)? {
             Err(ErrorKind::AlreadyExists)?;
         }
+
+        debug!("Running");
 
         let result = loop {
             let result = self.wait();
@@ -460,7 +394,8 @@ impl<const N: usize> VfsReactor<N> {
         let mut fds = Fds::new();
 
         if let Some(max) = self.lock(|inner| inner.set_fds(&mut fds))? {
-            error!("SELECTING");
+            debug!("Start select");
+
             syscall_los!(unsafe {
                 sys::select(
                     max + 1,
@@ -471,7 +406,8 @@ impl<const N: usize> VfsReactor<N> {
                 )
             })?;
 
-            error!("SELECTING OUTCOME");
+            debug!("End select");
+
             self.lock(|inner| inner.update_events(&fds))?;
         }
 

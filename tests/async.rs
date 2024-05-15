@@ -1,13 +1,15 @@
+use core::future::Future;
+
 use std::io;
-use std::net::{Ipv4Addr, Shutdown, SocketAddr, SocketAddrV4, TcpListener, TcpStream, UdpSocket};
+use std::net::{Shutdown, TcpListener, TcpStream, UdpSocket};
 use std::sync::Arc;
 use std::thread;
 
 use async_io_mini::Async;
 
 use embassy_time::{Duration, Timer};
+
 use futures_lite::{future, prelude::*};
-use log::error;
 
 const LOREM_IPSUM: &[u8] = b"
 Lorem ipsum dolor sit amet, consectetur adipiscing elit.
