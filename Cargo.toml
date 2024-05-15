@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-#default = ["futures-io", "futures-lite"]
+default = ["futures-io", "futures-lite"]
 
 [dependencies]
 libc = "0.2"
@@ -15,8 +15,12 @@ futures-io = { version = "0.3", default-features = false, optional = true, featu
 futures-lite = { version = "1", default-features = false, optional = true }
 
 [dev-dependencies]
-futures-io = { version = "0.3", default-features = false, optional = false, features = ["std"] }
-futures-lite = { version = "1", default-features = false, optional = false }
+futures-io = "0.3"
+futures-lite = "1"
 embassy-time = { version = "0.3", features = ["std", "generic-queue"] }
 async-channel = "2"
 env_logger = "0.10"
+
+[[test]]
+name = "async"
+required-features = ["futures-io", "futures-lite"]
