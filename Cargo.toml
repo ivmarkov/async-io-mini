@@ -16,7 +16,7 @@ edge-nal = { git = "https://github.com/ivmarkov/edge-net" }
 
 [features]
 default = ["futures-io", "futures-lite"]
-edge-nal = ["embedded-io-async", "dep:edge-nal", "futures-io", "futures-lite/std"]
+edge-nal = ["embedded-io-async", "dep:edge-nal", "futures-io", "futures-lite/std", "embassy-time"]
 
 [dependencies]
 libc = "0.2"
@@ -27,6 +27,7 @@ futures-io = { version = "0.3", default-features = false, optional = true, featu
 futures-lite = { version = "1", default-features = false, optional = true }
 edge-nal = { version = "0.2", default-features = false, optional = true }
 embedded-io-async = { version = "0.6", optional = true, features = ["std"] }
+embassy-time = { version = "0.3", optional = true }
 
 [dev-dependencies]
 futures-io = "0.3"

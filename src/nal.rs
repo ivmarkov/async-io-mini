@@ -89,7 +89,7 @@ impl TcpAccept for TcpAcceptor {
             match self.0.as_ref().accept() {
                 Ok((socket, _)) => break Ok((socket.peer_addr()?, TcpSocket(Async::new(socket)?))),
                 Err(err) if err.kind() == io::ErrorKind::WouldBlock => {
-                    async_io::Timer::after(core::time::Duration::from_millis(5)).await;
+                    embassy_time::Timer::after(embassy_time::Duration::from_millis(5)).await;
                 }
                 Err(err) => break Err(err),
             }

@@ -36,8 +36,6 @@ use std::net::{SocketAddr, TcpListener, TcpStream, UdpSocket};
 use std::os::fd::FromRawFd;
 use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, OwnedFd, RawFd};
 
-use log::error;
-
 use libc as sys;
 
 use reactor::{Event, REACTOR};
@@ -380,11 +378,9 @@ impl<T: AsFd> Async<T> {
     /// # std::io::Result::Ok(()) });
     /// ```
     pub fn poll_readable(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        if REACTOR.fetch(self.as_fd().as_raw_fd(), Event::Read)? {
+        if REACTOR.fetch_or_set(self.as_fd().as_raw_fd(), Event::Read, cx.waker())? {
             Poll::Ready(Ok(()))
         } else {
-            REACTOR.set(self.as_fd().as_raw_fd(), Event::Read, cx.waker())?;
-
             Poll::Pending
         }
     }
@@ -418,11 +414,9 @@ impl<T: AsFd> Async<T> {
     /// # std::io::Result::Ok(()) });
     /// ```
     pub fn poll_writable(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        if REACTOR.fetch(self.as_fd().as_raw_fd(), Event::Write)? {
+        if REACTOR.fetch_or_set(self.as_fd().as_raw_fd(), Event::Write, cx.waker())? {
             Poll::Ready(Ok(()))
         } else {
-            REACTOR.set(self.as_fd().as_raw_fd(), Event::Write, cx.waker())?;
-
             Poll::Pending
         }
     }
@@ -954,10 +948,12 @@ impl Async<TcpStream> {
             SocketAddr::V4(v4) => {
                 let addr = sys::sockaddr_in {
                     sin_family: sys::AF_INET as _,
-                    sin_port: u16::from_le_bytes(u16::to_be_bytes(v4.port())),
+                    sin_port: u16::to_be(v4.port()),
                     sin_addr: sys::in_addr {
-                        s_addr: u32::from_le_bytes(v4.ip().octets()),
+                        s_addr: u32::from_ne_bytes(v4.ip().octets()),
                     },
+                    #[cfg(target_os = "espidf")]
+                    sin_len: Default::default(),
                     sin_zero: Default::default(),
                 };
 
@@ -972,12 +968,14 @@ impl Async<TcpStream> {
             SocketAddr::V6(v6) => {
                 let addr = sys::sockaddr_in6 {
                     sin6_family: sys::AF_INET6 as _,
-                    sin6_port: v6.port(),
+                    sin6_port: u16::to_be(v6.port()),
                     sin6_flowinfo: 0,
                     sin6_addr: sys::in6_addr {
                         s6_addr: v6.ip().octets(),
                     },
                     sin6_scope_id: 0,
+                    #[cfg(target_os = "espidf")]
+                    sin6_len: Default::default(),
                 };
 
                 connect(
@@ -992,8 +990,6 @@ impl Async<TcpStream> {
 
         // Use new_nonblocking because connect already sets socket to non-blocking mode.
         let stream = Async::new_nonblocking(TcpStream::from(socket))?;
-
-        error!("WRITABLE?");
 
         // The stream becomes writable when connected.
         stream.writable().await?;

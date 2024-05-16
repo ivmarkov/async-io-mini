@@ -6,6 +6,7 @@ use std::io::{self, ErrorKind};
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 
 use enumset::{EnumSet, EnumSetType};
+
 use log::debug;
 
 use libc as sys;
@@ -256,8 +257,33 @@ impl<const N: usize> Registrations<N> {
 
     fn create_notification(&mut self) -> io::Result<bool> {
         if self.event_fd.is_none() {
+            #[cfg(not(target_os = "espidf"))]
+            let event_fd =
+                unsafe { OwnedFd::from_raw_fd(syscall_los!(sys::eventfd(0, sys::EFD_NONBLOCK))?) };
+
+            // Note that the eventfd() implementation in ESP-IDF deviates from the specification in the following ways:
+            // 1) The file descriptor is always in a non-blocking mode, as if EFD_NONBLOCK was passed as a flag;
+            //    passing EFD_NONBLOCK or calling fcntl(.., F_GETFL/F_SETFL) on the eventfd() file descriptor is not supported
+            // 2) It always returns the counter value, even if it is 0. This is contrary to the specification which mandates
+            //    that it should instead fail with EAGAIN
+            //
+            // (1) is not a problem for us, as we want the eventfd() file descriptor to be in a non-blocking mode anyway
+            // (2) is also not a problem, as long as we don't try to read the counter value in an endless loop when we detect being notified
+            #[cfg(target_os = "espidf")]
             let event_fd = unsafe {
-                OwnedFd::from_raw_fd(syscall_los!(sys::eventfd(0, sys::O_NONBLOCK as _))?)
+                OwnedFd::from_raw_fd(syscall_los!(sys::eventfd(0, 0)).map_err(|err| {
+                    match err {
+                        err if err.kind() == io::ErrorKind::PermissionDenied => {
+                            // EPERM can happen if the eventfd isn't initialized yet.
+                            // Tell the user to call esp_vfs_eventfd_register.
+                            io::Error::new(
+                                io::ErrorKind::PermissionDenied,
+                                "failed to initialize eventfd for polling, try calling `esp_vfs_eventfd_register`"
+                            )
+                        },
+                        err => err,
+                    }
+                })?)
             };
 
             debug!("Created event FD: {}", event_fd.as_raw_fd());
@@ -360,12 +386,24 @@ impl<const N: usize> Reactor<N> {
         self.lock(|regs| regs.deregister(fd))
     }
 
-    pub(crate) fn set(&self, fd: RawFd, event: Event, waker: &Waker) -> io::Result<()> {
-        self.lock(|regs| regs.set(fd, event, waker))
-    }
+    // pub(crate) fn set(&self, fd: RawFd, event: Event, waker: &Waker) -> io::Result<()> {
+    //     self.lock(|regs| regs.set(fd, event, waker))
+    // }
 
     pub(crate) fn fetch(&self, fd: RawFd, event: Event) -> io::Result<bool> {
         self.lock(|regs| regs.fetch(fd, event))
+    }
+
+    pub(crate) fn fetch_or_set(&self, fd: RawFd, event: Event, waker: &Waker) -> io::Result<bool> {
+        self.lock(|regs| {
+            if regs.fetch(fd, event)? {
+                Ok(true)
+            } else {
+                regs.set(fd, event, waker)?;
+
+                Ok(false)
+            }
+        })
     }
 
     fn run(&self) -> io::Result<()> {
