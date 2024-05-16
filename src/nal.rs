@@ -395,6 +395,7 @@ mod raw {
     use edge_nal::{MacAddr, RawBind, RawReceive, RawSend, RawSplit};
     use embedded_io_async::ErrorType;
 
+    use crate::syscall_los;
     use crate::Async;
 
     #[derive(Default)]
@@ -412,7 +413,7 @@ mod raw {
         type Socket<'a> = RawSocket where Self: 'a;
 
         async fn bind(&self) -> Result<Self::Socket<'_>, Self::Error> {
-            let socket = cvt(unsafe {
+            let socket = syscall_los!(unsafe {
                 libc::socket(
                     libc::PF_PACKET,
                     libc::SOCK_DGRAM,
@@ -430,7 +431,7 @@ mod raw {
                 sll_addr: Default::default(),
             };
 
-            cvt(unsafe {
+            syscall_los!(unsafe {
                 libc::bind(
                     socket,
                     &sockaddr as *const _ as *const _,
@@ -439,7 +440,7 @@ mod raw {
             })?;
 
             // TODO
-            // cvt(unsafe {
+            // syscall_los!(unsafe {
             //     libc::setsockopt(socket, libc::SOL_PACKET, libc::PACKET_AUXDATA, &1_u32 as *const _ as *const _, 4)
             // })?;
 
@@ -485,7 +486,7 @@ mod raw {
                 let mut storage: libc::sockaddr_storage = unsafe { core::mem::zeroed() };
                 let mut addrlen = core::mem::size_of_val(&storage) as libc::socklen_t;
 
-                let ret = cvti(unsafe {
+                let ret = syscall_los!(unsafe {
                     libc::recvfrom(
                         io.as_fd().as_raw_fd(),
                         buffer.as_mut_ptr() as *mut _,
@@ -526,7 +527,7 @@ mod raw {
             let fut = pin!(self.0.write_with(|io| {
                 let len = core::cmp::min(data.len(), u16::MAX as usize);
 
-                let ret = cvti(unsafe {
+                let ret = syscall_los!(unsafe {
                     libc::sendto(
                         io.as_fd().as_raw_fd(),
                         data.as_ptr() as *const _,
@@ -593,32 +594,6 @@ mod raw {
                 Ok(unsafe { (storage as *const _ as *const libc::sockaddr_ll).as_ref() }.unwrap())
             }
             _ => Err(io::Error::new(ErrorKind::InvalidInput, "invalid argument")),
-        }
-    }
-
-    fn cvt<T>(res: T) -> io::Result<T>
-    where
-        T: Into<i64> + Copy,
-    {
-        let ires: i64 = res.into();
-
-        if ires == -1 {
-            Err(io::Error::last_os_error())
-        } else {
-            Ok(res)
-        }
-    }
-
-    fn cvti<T>(res: T) -> io::Result<T>
-    where
-        T: Into<isize> + Copy,
-    {
-        let ires: isize = res.into();
-
-        if ires == -1 {
-            Err(io::Error::last_os_error())
-        } else {
-            Ok(res)
         }
     }
 }

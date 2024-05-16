@@ -36,13 +36,13 @@ use std::net::{SocketAddr, TcpListener, TcpStream, UdpSocket};
 use std::os::fd::FromRawFd;
 use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, OwnedFd, RawFd};
 
-use libc as sys;
-
 use reactor::{Event, REACTOR};
 
 #[cfg(feature = "edge-nal")]
 pub mod nal;
+
 mod reactor;
+mod sys;
 
 /// Async adapter for I/O types.
 ///
@@ -145,16 +145,6 @@ mod reactor;
 #[derive(Debug)]
 pub struct Async<T: AsFd> {
     io: Option<T>,
-}
-
-#[macro_export]
-macro_rules! ready {
-    ($e:expr $(,)?) => {
-        match $e {
-            core::task::Poll::Ready(t) => t,
-            core::task::Poll::Pending => return core::task::Poll::Pending,
-        }
-    };
 }
 
 impl<T: AsFd> Unpin for Async<T> {}
