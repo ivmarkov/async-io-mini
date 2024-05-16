@@ -1,13 +1,9 @@
 # async-io-mini
 
-[![Build](https://github.com/ivmarkov/async-io-mini/workflows/Build%20and%20test/badge.svg)](
-https://github.com/ivmarkov/async-io-mini/actions)
-[![License](https://img.shields.io/badge/license-Apache--2.0_OR_MIT-blue.svg)](
-https://github.com/ivmarkov/async-io-mini)
-[![Cargo](https://img.shields.io/crates/v/async-io-mini.svg)](
-https://crates.io/crates/async-io-mini)
-[![Documentation](https://docs.rs/async-io/badge.svg)](
-https://docs.rs/async-io-mini)
+[![CI](https://github.com/ivmarkov/async-io-mini/actions/workflows/ci.yml/badge.svg)](https://github.com/ivmarkov/async-io-mini/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0_OR_MIT-blue.svg)](https://github.com/ivmarkov/async-io-mini)
+[![Cargo](https://img.shields.io/crates/v/async-io-mini.svg)](https://crates.io/crates/async-io-mini)
+[![Documentation](https://docs.rs/async-io/badge.svg)](https://docs.rs/async-io-mini)
 
 Async I/O.
 
