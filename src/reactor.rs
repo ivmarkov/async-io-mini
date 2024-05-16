@@ -323,12 +323,12 @@ impl<const N: usize> Registrations<N> {
     }
 }
 
-pub struct VfsReactor<const N: usize> {
+pub struct Reactor<const N: usize> {
     registrations: std::sync::Mutex<Registrations<N>>,
     started: AtomicBool,
 }
 
-impl<const N: usize> VfsReactor<N> {
+impl<const N: usize> Reactor<N> {
     const fn new() -> Self {
         Self {
             registrations: std::sync::Mutex::new(Registrations::new()),
@@ -424,4 +424,4 @@ impl<const N: usize> VfsReactor<N> {
     }
 }
 
-pub static REACTOR: VfsReactor<MAX_REGISTRATIONS> = VfsReactor::new();
+pub static REACTOR: Reactor<MAX_REGISTRATIONS> = Reactor::new();
