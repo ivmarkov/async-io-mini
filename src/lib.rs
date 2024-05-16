@@ -42,6 +42,8 @@ use libc as sys;
 
 use reactor::{Event, REACTOR};
 
+#[cfg(feature = "edge-nal")]
+pub mod nal;
 mod reactor;
 
 /// Async adapter for I/O types.
