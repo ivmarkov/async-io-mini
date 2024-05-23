@@ -59,7 +59,7 @@ To wait for the next I/O event, the "async-io-mini" thread uses the [select](htt
 
 ## Examples
 
-Connect to `example.com:80`, or time out after 10 seconds.
+Connect to `example.com:80`.
 
 ```rust
 use async_io_mini::Async;
