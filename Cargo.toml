@@ -11,12 +11,8 @@ keywords = ["select", "ESP IDF"]
 categories = ["asynchronous", "network-programming", "MCU", "embedded"]
 exclude = ["/.*"]
 
-[patch.crates-io]
-edge-nal = { git = "https://github.com/ivmarkov/edge-net" }
-
 [features]
 default = ["futures-io", "futures-lite"]
-edge-nal = ["embedded-io-async", "dep:edge-nal", "futures-io", "futures-lite/std", "embassy-time"]
 
 [dependencies]
 libc = "0.2"
@@ -25,8 +21,6 @@ heapless = "0.8"
 log = { version = "0.4", default-features = false }
 futures-io = { version = "0.3", default-features = false, optional = true, features = ["std"] }
 futures-lite = { version = "1", default-features = false, optional = true }
-edge-nal = { version = "0.2", default-features = false, optional = true }
-embedded-io-async = { version = "0.6", optional = true, features = ["std"] }
 embassy-time = { version = "0.3", optional = true }
 
 [dev-dependencies]

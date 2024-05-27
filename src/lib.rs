@@ -38,9 +38,6 @@ use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, OwnedFd, RawFd};
 
 use reactor::{Event, REACTOR};
 
-#[cfg(feature = "edge-nal")]
-pub mod nal;
-
 mod reactor;
 mod sys;
 
