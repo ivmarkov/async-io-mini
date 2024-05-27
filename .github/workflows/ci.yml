@@ -37,8 +37,6 @@ jobs:
         run: cargo build
       - name: Build | Non-default
         run: cargo build --no-default-features
-      - name: Build | edge-nal
-        run: cargo build --no-default-features --features edge-nal
       - name: Test
         run: cargo test
 #      - name: Build | Examples
