@@ -21,7 +21,7 @@ So either:
 
 ## Justification
 
-While `async-io` supports a ton of operating systems - _including ESP-IDF for the Espressif MCU chips_ - it does have a non-trivial memory consumption in the hidden thread named `async-io`.  Since its hidden `Reactor` object is initialized lazily, it so happens that it is first allocated on-stack, and then it is moved into the static context. This requires the `async-io` thread to have at least 8K stack, which - by MCU standards! - is relatively large if you are memory-constrained.
+While `async-io` supports a ton of operating systems - _including ESP-IDF for the Espressif MCU chips_ - it does have a non-trivial memory consumption in the hidden thread named `async-io`.  Since its hidden `Reactor` object is initialized lazily, it so happens that it is first allocated on-stack, and then it is moved into the static context. This requires the `async-io` thread (as well as _any_ thread from where you are polling sockets) to have at least 8K stack, which - by MCU standards! - is relatively large if you are memory-constrained.
 
 In contrast, `async-io-mini`:
 - Needs < 3K of stack with ESP-IDF (and that's only because ESP-IDF interrupts are executed on the stack of the interrupted thread, i.e. we need to leave some room for these);
