@@ -5,10 +5,12 @@ use libc as sys;
 #[macro_export]
 macro_rules! syscall {
     ($ret:expr) => {{
-        if $ret != 0 {
-            Err(::std::io::Error::from_raw_os_error($ret))
+        let result = $ret;
+
+        if result != 0 {
+            Err(::std::io::Error::from_raw_os_error(result))
         } else {
-            Ok($ret)
+            Ok(result)
         }
     }};
 }
@@ -16,10 +18,12 @@ macro_rules! syscall {
 #[macro_export]
 macro_rules! syscall_los {
     ($ret:expr) => {{
-        if $ret == (u32::MAX as _) {
-            Err(io::Error::last_os_error())
+        let result = $ret;
+
+        if result == -1 {
+            Err(::std::io::Error::last_os_error())
         } else {
-            Ok($ret)
+            Ok(result)
         }
     }};
 }
