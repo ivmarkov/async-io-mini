@@ -27,6 +27,9 @@
 //! # std::io::Result::Ok(()) });
 //! ```
 
+#![allow(unknown_lints)]
+#![allow(clippy::needless_maybe_sized)]
+
 use core::future::{poll_fn, Future};
 use core::pin::pin;
 use core::task::{Context, Poll};
