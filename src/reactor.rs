@@ -164,6 +164,7 @@ impl<const N: usize> Registrations<N> {
         Ok(set)
     }
 
+    #[allow(deprecated)]
     fn set_fds(&self, fds: &mut Fds) -> io::Result<Option<RawFd>> {
         fds.zero();
 
