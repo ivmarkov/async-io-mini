@@ -194,6 +194,7 @@ impl<const N: usize> Registrations<N> {
         Ok(max)
     }
 
+    #[allow(deprecated)]
     fn update_events(&mut self, fds: &Fds) -> io::Result<()> {
         debug!("Updating events");
 
