@@ -106,7 +106,7 @@ impl<const N: usize> Registrations<N> {
             Err(ErrorKind::InvalidInput)?;
         }
 
-        if fd >= sys::FD_SETSIZE as RawFd {
+        if fd >= sys::FD_SETSIZE as RawFd || fd >= N as RawFd {
             Err(ErrorKind::OutOfMemory)?;
         }
 
