@@ -20,7 +20,7 @@ use crate::{syscall, syscall_los, syscall_los_eagain};
 const MAX_REGISTRATIONS: usize = 20;
 
 #[cfg(not(target_os = "espidf"))]
-const MAX_REGISTRATIONS: usize = sys::FD_SETSIZE as usize;
+const MAX_REGISTRATIONS: usize = sys::FD_SETSIZE;
 
 #[derive(EnumSetType, Debug)]
 pub(crate) enum Event {
