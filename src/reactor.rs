@@ -14,9 +14,13 @@ use libc as sys;
 
 use crate::{syscall, syscall_los, syscall_los_eagain};
 
+// For ESP-IDF sys::FDSETSIZE is currently wrongly set to 1024 in the `libc` crate
+// Therefore, use a custom value for now
+#[cfg(target_os = "espidf")]
 const MAX_REGISTRATIONS: usize = 20;
 
-//const FD_SEGMENT: usize = sys::FD_SETSIZE / core::mem::size_of::<sys::fd_set>();
+#[cfg(not(target_os = "espidf"))]
+const MAX_REGISTRATIONS: usize = sys::FD_SETSIZE as usize;
 
 #[derive(EnumSetType, Debug)]
 pub(crate) enum Event {
