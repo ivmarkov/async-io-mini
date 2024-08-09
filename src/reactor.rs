@@ -17,10 +17,14 @@ use crate::{syscall, syscall_los, syscall_los_eagain};
 // For ESP-IDF sys::FDSETSIZE is currently wrongly set to 1024 in the `libc` crate
 // Therefore, use a custom value for now
 #[cfg(target_os = "espidf")]
-const MAX_REGISTRATIONS: usize = 20;
+const MAX_FDS: usize = 64;
 
 #[cfg(not(target_os = "espidf"))]
-const MAX_REGISTRATIONS: usize = sys::FD_SETSIZE;
+const MAX_FDS: usize = sys::FD_SETSIZE;
+
+// In future, we might want to use a smaller - and possibly - configurable - with cargo feature(s)
+// amount of registrations to save memory, but for now, let's use the maximum amount
+const MAX_REGISTRATIONS: usize = MAX_FDS;
 
 #[derive(EnumSetType, Debug)]
 pub(crate) enum Event {
@@ -110,8 +114,8 @@ impl<const N: usize> Registrations<N> {
             Err(ErrorKind::InvalidInput)?;
         }
 
-        if fd >= sys::FD_SETSIZE as RawFd || fd >= N as RawFd {
-            Err(ErrorKind::OutOfMemory)?;
+        if fd >= MAX_FDS as RawFd {
+            Err(ErrorKind::InvalidInput)?;
         }
 
         if self.vec.iter().any(|reg| reg.fd == fd) {
