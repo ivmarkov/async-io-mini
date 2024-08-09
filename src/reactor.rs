@@ -345,11 +345,11 @@ impl<const N: usize> Reactor<N> {
     }
 
     pub(crate) fn register(&self, fd: RawFd) -> io::Result<()> {
-        self.lock_modify(|regs| regs.register(fd))
+        self.modify(|regs| regs.register(fd))
     }
 
     pub(crate) fn deregister(&self, fd: RawFd) -> io::Result<()> {
-        self.lock_modify(|regs| regs.deregister(fd))
+        self.modify(|regs| regs.deregister(fd))
     }
 
     // pub(crate) fn set(&self, fd: RawFd, event: Event, waker: &Waker) -> io::Result<()> {
@@ -357,11 +357,11 @@ impl<const N: usize> Reactor<N> {
     // }
 
     pub(crate) fn fetch(&self, fd: RawFd, event: Event) -> io::Result<bool> {
-        self.lock_modify(|regs| regs.fetch(fd, event))
+        self.modify(|regs| regs.fetch(fd, event))
     }
 
     pub(crate) fn fetch_or_set(&self, fd: RawFd, event: Event, waker: &Waker) -> io::Result<bool> {
-        self.lock_modify(|regs| {
+        self.modify(|regs| {
             if regs.fetch(fd, event)? {
                 Ok(true)
             } else {
@@ -383,7 +383,7 @@ impl<const N: usize> Reactor<N> {
         let mut update = false;
 
         let result = loop {
-            let max = self.lock_apply(|inner| {
+            let max = self.apply(|inner| {
                 if !update {
                     update = true;
                 } else {
@@ -427,7 +427,7 @@ impl<const N: usize> Reactor<N> {
         result
     }
 
-    fn lock_modify<F, R>(&self, f: F) -> io::Result<R>
+    fn modify<F, R>(&self, f: F) -> io::Result<R>
     where
         F: FnOnce(&mut Registrations<N>) -> io::Result<R>,
     {
@@ -447,7 +447,7 @@ impl<const N: usize> Reactor<N> {
         })
     }
 
-    fn lock_apply<F, R>(&self, f: F) -> io::Result<R>
+    fn apply<F, R>(&self, f: F) -> io::Result<R>
     where
         F: FnOnce(&mut Registrations<N>) -> io::Result<R>,
     {
