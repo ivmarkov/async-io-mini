@@ -68,7 +68,7 @@ As per above, the `Timer` type is a wrapper around the functionality provided by
 
 ## Examples
 
-Connect to `example.com:80`.
+Connect to `example.com:80`, or time out after 10 seconds.
 
 ```rust
 use async_io_mini::{Async, Timer};
