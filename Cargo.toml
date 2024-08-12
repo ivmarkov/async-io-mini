@@ -12,7 +12,8 @@ categories = ["asynchronous", "network-programming", "MCU", "embedded"]
 exclude = ["/.*"]
 
 [features]
-default = ["futures-io", "futures-lite"]
+default = ["futures-io", "futures-lite", "embassy-time"]
+embassy-time = ["embassy-time-driver", "embassy-time-queue-driver", "dep:embassy-time"]
 
 [dependencies]
 libc = "0.2"
@@ -21,6 +22,8 @@ heapless = "0.8"
 log = { version = "0.4", default-features = false }
 futures-io = { version = "0.3", default-features = false, optional = true, features = ["std"] }
 futures-lite = { version = "1", default-features = false, optional = true }
+embassy-time-driver = { version = "0.1", optional = true }
+embassy-time-queue-driver = { version = "0.1", optional = true }
 embassy-time = { version = "0.3", optional = true }
 
 [dev-dependencies]
@@ -32,4 +35,8 @@ env_logger = "0.10"
 
 [[test]]
 name = "async"
-required-features = ["futures-io", "futures-lite"]
+required-features = ["futures-io", "futures-lite", "embassy-time"]
+
+[[test]]
+name = "timer"
+required-features = ["futures-lite", "embassy-time"]
