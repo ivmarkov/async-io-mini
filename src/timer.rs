@@ -48,7 +48,6 @@ use std::time::Instant;
 ///     .await?;
 /// # std::io::Result::Ok(()) });
 /// ```
-//#[derive(Debug)] TODO
 pub struct Timer {
     when: Option<Instant>,
     period: Duration,
