@@ -5,9 +5,9 @@
 [![Cargo](https://img.shields.io/crates/v/async-io-mini.svg)](https://crates.io/crates/async-io-mini)
 [![Documentation](https://docs.rs/async-io/badge.svg)](https://docs.rs/async-io-mini)
 
-Async I/O. **EXPERIMENTAL!!**
+Async I/O and timers. **Experimental**
 
-This crate is an **experimental** fork of the splendid [`async-io`](https://github.com/smol-rs/async-io) crate targetting MCUs and ESP-IDF in particular.
+This crate is an experimental fork of the splendid [`async-io`](https://github.com/smol-rs/async-io) crate targetting MCUs and ESP-IDF in particular.
 
 ## How to use?
 
@@ -71,7 +71,7 @@ As per above, the `Timer` type is a wrapper around the functionality provided by
 Connect to `example.com:80`.
 
 ```rust
-use async_io_mini::Async;
+use async_io_mini::{Async, Timer};
 use futures_lite::{future::FutureExt, io};
 
 use std::net::{TcpStream, ToSocketAddrs};
@@ -79,7 +79,11 @@ use std::time::Duration;
 
 let addr = "example.com:80".to_socket_addrs()?.next().unwrap();
 
-let stream = Async::<TcpStream>::connect(addr).await?;
+let stream = Async::<TcpStream>::connect(addr).or(async {
+    Timer::after(Duration::from_secs(10)).await;
+    Err(io::ErrorKind::TimedOut.into())
+})
+.await?;
 ```
 
 ## License
