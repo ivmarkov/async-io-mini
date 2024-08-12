@@ -5,13 +5,13 @@
 [![Cargo](https://img.shields.io/crates/v/async-io-mini.svg)](https://crates.io/crates/async-io-mini)
 [![Documentation](https://docs.rs/async-io/badge.svg)](https://docs.rs/async-io-mini)
 
-Async I/O. **EXPERIMENTAL!!**
+Async I/O and timers. **Experimental**
 
-This crate is an **experimental** fork of the splendid [`async-io`](https://github.com/smol-rs/async-io) crate targetting MCUs and ESP-IDF in particular.
+This crate is an experimental fork of the splendid [`async-io`](https://github.com/smol-rs/async-io) crate targetting MCUs and ESP-IDF in particular.
 
 ## How to use?
 
-`async-io-mini` is a drop-in, API-compatible replacement for the `Async` type from `async-io` (but does NOT have an equivalent of `Timer` - see why [below](#limitations)).
+`async-io-mini` is a drop-in, API-compatible replacement for the `Async` and `Timer` types from `async-io`.
 
 So either:
 * Just replace all `use async_io` occurances in your crate with `use async_io_mini`
@@ -37,13 +37,16 @@ Further, `async-io` has a non-trivial set of dependencies (again - for MCUs; for
 - `log` (might become optional);
 - `enumset` (not crucial, might remove).
 
+## Enhancements
+
+The `Timer` type of `async_io_mini` is based on the `embassy-time` crate, and as such should offer a higher resolution on embedded operating systems like the ESP-IDF than what can be normally achieved by implementing timers using the `timeout` parameter of the `select` syscall (as `async-io` does). 
+
+The reason for this is that on the ESP-IDF, the `timeout` parameter of `select` provides a resolution of 10ms (one FreeRTOS sys-tick), while
+`embassy-time` is implemented using the [ESP-IDF Timer service](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/esp_timer.html), which provides resolutions up to 1 microsecond.
+
+With that said, for greenfield code that does not need to be compatible with `async-io`, use the native `embassy_time::Timer` and `embassy_time::Ticker` rather than `async_io_mini::Timer`, because the latter has a larger memory footprint (40 bytes on 32bit archs) compared to the `embassy-time` types (8 and 16 bytes each).
+
 ## Limitations
-
-### No timers
-
-`async-io-mini` does NOT have an equivalent of `async_io::Timer`. On ESP-IDF at least, timers based on OS systicks are often not very useful, as the OS systick is low-res (10ms).
-
-Workaround: use the `Timer` struct from the [`embassy-time`](https://crates.io/crates/embassy-time) crate, which provides a very similar API and is highly optimized for embedded environments. On the ESP-IDF, the `embassy-time-driver` implementation is backed by the ESP-IDF Timer service, which runs off from a high priority thread by default and thus has good res.
 
 ### No equivalent of `async_io::block_on`
 
@@ -51,18 +54,24 @@ Implementing socket polling as a shared task between the hidden `async-io-mini` 
 
 ## Implementation
 
+### Async
+
 The first time `Async` is used, a thread named `async-io-mini` will be spawned.
 The purpose of this thread is to wait for I/O events reported by the operating system, and then
 wake appropriate futures blocked on I/O when they can be resumed.
 
 To wait for the next I/O event, the "async-io-mini" thread uses the [select](https://en.wikipedia.org/wiki/Select_(Unix)) syscall, and **is thus only useful for MCUs (might just be the ESP-IDF) where the number of file or socket handles is very small anyway**.
 
+### Timer
+
+As per above, the `Timer` type is a wrapper around the functionality provided by the `embassy-time` crate.
+
 ## Examples
 
-Connect to `example.com:80`.
+Connect to `example.com:80`, or time out after 10 seconds.
 
 ```rust
-use async_io_mini::Async;
+use async_io_mini::{Async, Timer};
 use futures_lite::{future::FutureExt, io};
 
 use std::net::{TcpStream, ToSocketAddrs};
@@ -70,7 +79,11 @@ use std::time::Duration;
 
 let addr = "example.com:80".to_socket_addrs()?.next().unwrap();
 
-let stream = Async::<TcpStream>::connect(addr).await?;
+let stream = Async::<TcpStream>::connect(addr).or(async {
+    Timer::after(Duration::from_secs(10)).await;
+    Err(io::ErrorKind::TimedOut.into())
+})
+.await?;
 ```
 
 ## License
