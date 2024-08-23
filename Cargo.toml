@@ -1,6 +1,6 @@
 [package]
 name = "async-io-mini"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Stjepan Glavina <stjepang@gmail.com>", "Ivan Markov"]
 edition = "2021"
 rust-version = "1.77"
@@ -21,14 +21,14 @@ enumset = "1"
 heapless = "0.8"
 log = { version = "0.4", default-features = false }
 futures-io = { version = "0.3", default-features = false, optional = true, features = ["std"] }
-futures-lite = { version = "1", default-features = false, optional = true }
+futures-lite = { version = "2", default-features = false, optional = true }
 embassy-time-driver = { version = "0.1", optional = true }
 embassy-time-queue-driver = { version = "0.1", optional = true }
 embassy-time = { version = "0.3", optional = true }
 
 [dev-dependencies]
 futures-io = "0.3"
-futures-lite = "1"
+futures-lite = "2"
 embassy-time = { version = "0.3", features = ["std", "generic-queue"] }
 async-channel = "2"
 env_logger = "0.10"
