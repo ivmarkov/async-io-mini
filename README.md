@@ -5,9 +5,9 @@
 [![Cargo](https://img.shields.io/crates/v/async-io-mini.svg)](https://crates.io/crates/async-io-mini)
 [![Documentation](https://docs.rs/async-io/badge.svg)](https://docs.rs/async-io-mini)
 
-Async I/O and timers. **Experimental**
+Async I/O and timers for MCUs.
 
-This crate is an experimental fork of the splendid [`async-io`](https://github.com/smol-rs/async-io) crate targetting MCUs and ESP-IDF in particular.
+This crate is a fork of the splendid [`async-io`](https://github.com/smol-rs/async-io) crate targetting MCUs and ESP-IDF in particular.
 
 ## How to use?
 
