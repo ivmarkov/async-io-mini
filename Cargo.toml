@@ -7,7 +7,7 @@ rust-version = "1.77"
 description = "Async I/O fork for embedded systems"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/ivmarkov/async-io-mini"
-keywords = ["select", "ESP IDF"]
+keywords = ["select", "ESP-IDF"]
 categories = ["asynchronous", "network-programming", "MCU", "embedded"]
 exclude = ["/.*"]
 
