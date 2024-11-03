@@ -8,7 +8,7 @@ use std::sync::MutexGuard;
 
 use enumset::{EnumSet, EnumSetType};
 
-use log::debug;
+use log::{debug, info};
 
 use libc as sys;
 
@@ -329,6 +329,8 @@ impl<const N: usize> Reactor<N> {
         if self.started.swap(true, Ordering::SeqCst) {
             return Ok(false);
         }
+
+        info!("Starting reactor");
 
         std::thread::Builder::new()
             .name("async-io-mini".into())
