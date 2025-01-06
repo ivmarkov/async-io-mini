@@ -43,8 +43,8 @@ Further, `async-io` has a non-trivial set of dependencies (again - for MCUs; for
 
 The `Timer` type of `async_io_mini` is based on the `embassy-time` crate, and as such should offer a higher resolution on embedded operating systems like the ESP-IDF than what can be normally achieved by implementing timers using the `timeout` parameter of the `select` syscall (as `async-io` does).
 
-The reason for this is that on the ESP-IDF, the `timeout` parameter of `select` provides a resolution of 10ms (one FreeRTOS sys-tick), while
-`embassy-time` is implemented using the [ESP-IDF Timer service](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/esp_timer.html), which provides resolutions up to 1 microsecond.
+The reason for this is that on the ESP-IDF, the `timeout` parameter of `select` provides a resolution of 10 milliseconds (one FreeRTOS sys-tick), while
+`embassy-time` is implemented using the [ESP-IDF Timer service](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/esp_timer.html), which provides resolutions down to 20-30 microseconds.
 
 With that said, for greenfield code that does not need to be compatible with `async-io`, use the native `embassy_time::Timer` and `embassy_time::Ticker` rather than `async_io_mini::Timer`, because the latter has a larger memory footprint (40 bytes on 32bit archs) compared to the `embassy-time` types (8 and 16 bytes each).
 
