@@ -11,13 +11,15 @@ This crate is a fork of the splendid [`async-io`](https://github.com/smol-rs/asy
 
 ## How to use?
 
-`async-io-mini` is a drop-in, API-compatible replacement for the `Async` and `Timer` types from `async-io`.
+`async-io-mini` is an API-compatible replacement for the `Async` and `Timer` types from `async-io`.
 
 So either:
 * Just replace all `use async_io` occurances in your crate with `use async_io_mini`
 * Or - in your `Cargo.toml` - replace:
   * `async-io = "..."`
   * with `async-io = { package = "async-io-mini", ... }`
+
+Additionally, you need to provide an `embassy-time-driver` implementation. This is either done by the HAL of your MCU, or `embassy-time` provides you with a `std`-specific implementation. If you are not using `embassy-executor`, you will also need to select one of the `embassy-time/generic-queue-*` features.
 
 ## Justification
 
@@ -39,7 +41,7 @@ Further, `async-io` has a non-trivial set of dependencies (again - for MCUs; for
 
 ## Enhancements
 
-The `Timer` type of `async_io_mini` is based on the `embassy-time` crate, and as such should offer a higher resolution on embedded operating systems like the ESP-IDF than what can be normally achieved by implementing timers using the `timeout` parameter of the `select` syscall (as `async-io` does). 
+The `Timer` type of `async_io_mini` is based on the `embassy-time` crate, and as such should offer a higher resolution on embedded operating systems like the ESP-IDF than what can be normally achieved by implementing timers using the `timeout` parameter of the `select` syscall (as `async-io` does).
 
 The reason for this is that on the ESP-IDF, the `timeout` parameter of `select` provides a resolution of 10ms (one FreeRTOS sys-tick), while
 `embassy-time` is implemented using the [ESP-IDF Timer service](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/esp_timer.html), which provides resolutions up to 1 microsecond.
