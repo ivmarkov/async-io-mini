@@ -283,7 +283,7 @@ impl Timer {
             self.period = Duration::MAX;
 
             if let Some(waker) = self.waker.as_ref() {
-                embassy_time_queue_driver::schedule_wake(ticks, waker);
+                embassy_time_driver::schedule_wake(ticks, waker);
             }
         } else {
             self.set_never();
@@ -347,7 +347,7 @@ impl Timer {
             self.period = period;
 
             if let Some(waker) = self.waker.as_ref() {
-                embassy_time_queue_driver::schedule_wake(ticks, waker);
+                embassy_time_driver::schedule_wake(ticks, waker);
             }
         } else {
             // Overflow to never going off.
@@ -375,7 +375,7 @@ impl Timer {
                     .unwrap_or(true)
                 {
                     self.waker = Some(cx.waker().clone());
-                    embassy_time_queue_driver::schedule_wake(ticks, cx.waker());
+                    embassy_time_driver::schedule_wake(ticks, cx.waker());
                 }
             } else {
                 self.set_never();
